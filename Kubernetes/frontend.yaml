@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-server
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      bb: web-front
+  template:
+    metadata:
+      labels:
+        bb: web-front
+    spec:
+      serviceAccountName: api-service-account
+      volumes:
+      - name: vol
+        persistentVolumeClaim:
+          claimName: hostclaim
+      containers:
+      - name: frontend-site
+        image: flask:1.0
+        volumeMounts:
+        - mountPath: "/mnt/data"
+	  subPath: "/data"
+          name: vol
+        - mountPath: "/mnt/internal"
+	  subPath: "/internal"
+          name: vol
+      - name: scheduler-site
+        image: scheduler:1.0
+        volumeMounts:
+        - mountPath: "/mnt/internal"
+          subPath: "/internal"
+          name: vol
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bb-entrypoint
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    bb: web-front
+  ports:
+  - port: 5000
+    targetPort: 5000
+    nodePort: 30001
+

@@ -1,0 +1,30 @@
+<doctype html>
+<head>
+    <title>Cloud Server for Computing</title>
+    
+    <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+</head>
+
+<body style="margin:30">
+    <a href="{{ url_for('.index') }}"> Abbrechen </a>
+    <p>
+    <p>
+     
+    {% from "_formhelper.html" import render_field %}
+    <form method="POST" enctype="multipart/form-data">
+      <dl>
+        {{ form.hidden_tag() }} 
+        {{ render_field(form.task_type) }}
+        {{ render_field(form.owner) }}
+        {{ render_field(form.duration) }}
+        <p>
+        {{ render_field(form.file) }}
+      </dl>
+      <p><input type=submit value=Hinzufügen>
+    </form>
+</body>
