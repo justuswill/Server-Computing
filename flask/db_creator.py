@@ -17,7 +17,8 @@ class Task(Base):
     status = Column(String)
  
     def __repr__(self):
-        return "%s - %10s - id: %s"%(self.owner, self.task_type, self.id)
-  
+        return "%s - %10s - id: %s" % (self.owner, self.task_type, self.id)
+
+
 # create tables
 Base.metadata.create_all(engine)

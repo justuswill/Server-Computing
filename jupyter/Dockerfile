@@ -8,6 +8,6 @@ EXPOSE 8888
 RUN jupyter notebook --generate-config && \
     cd /root/.jupyter/ && \
     echo "c.NotebookApp.password = u'sha1:dc571ce166f1:044688aec2655ac0ac729343cf209304586139e6'" >> jupyter_notebook_config.py
-COPY hello.ipynb .
-COPY ${PY_FILE} .
-CMD ["jupyter", "notebook", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]
+COPY entrypoint.sh /
+RUN chmod 777 /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

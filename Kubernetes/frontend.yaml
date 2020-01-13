@@ -23,17 +23,17 @@ spec:
         image: flask:1.0
         volumeMounts:
         - mountPath: "/mnt/data"
-	  subPath: "/data"
           name: vol
+          subPath: "data"
         - mountPath: "/mnt/internal"
-	  subPath: "/internal"
           name: vol
+          subPath: "internal"
       - name: scheduler-site
         image: scheduler:1.0
         volumeMounts:
         - mountPath: "/mnt/internal"
-          subPath: "/internal"
           name: vol
+          subPath: "internal"
 ---
 apiVersion: v1
 kind: Service

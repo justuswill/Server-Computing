@@ -1,8 +1,12 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: api-service-account
+---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: api-access
-rules:
 rules:
   -
     apiGroups:
