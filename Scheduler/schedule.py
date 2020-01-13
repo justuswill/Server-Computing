@@ -7,7 +7,7 @@ import logging
 
 
 def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
-    '''
+    """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
     -----
     Create a Job from the Notebook-Container:
@@ -31,17 +31,17 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
       - persistentVolumeClaim:
         - claimName: <VOLUME_NAME>
     ----------
-    '''
+    """
     JOB_NAME = "notebook-%02d" % id
     VOLUME_NAME = "hostclaim"
     
     # The place to mount the datasets
-    mount = client.V1VolumeMount(
+    data_mount = client.V1VolumeMount(
             mount_path="/data",
             sub_path="data",
             name="vol")
     # The place to mount the scripts
-    mount = client.V1VolumeMount(
+    script_mount = client.V1VolumeMount(
             mount_path="/scripts",
             sub_path="internal/" + USER,
             name="vol")
@@ -57,7 +57,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
             name="notebook-site",
             image="notebookserver:1.0",
             env=[env],
-            volume_mounts=[mount])
+            volume_mounts=[data_mount, script_mount])
     # Labels
     # selector = client.V1LabelSelector(match_labels={"app":APP_NAME})
     # Pod-Spec
@@ -91,7 +91,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
 
 
 def create_service(api_instance, id):
-    '''
+    """
     Input: Needs an instance of the CoreV1Api
     -----
     Create a Service for the Notebook-Job:
@@ -110,21 +110,21 @@ def create_service(api_instance, id):
         targetPort: 8888
         nodePort: NODE_PORT
     -----
-    '''
+    """
     SERVICE_NAME = "nb-entrypoint-%02d" % id
     NODE_PORT = 31000 + id
     
-    #Port
+    # Port
     port = client.V1ServicePort(
-            port = 8888,
-            target_port = 8888,
-            node_port = NODE_PORT)
-    #Job-Spec
+            port=8888,
+            target_port=8888,
+            node_port=NODE_PORT)
+    # Job-Spec
     spec = client.V1ServiceSpec(
-            selector={"id":str(id)},
+            selector={"id": str(id)},
             type='NodePort',
             ports=[port])
-    #Service-Objekt
+    # Service-Objekt
     service = client.V1Service(
             api_version="v1",
             kind="Service",
@@ -133,7 +133,7 @@ def create_service(api_instance, id):
                     labels={"sid": str(id)}),
             spec=spec)
     
-    #Add Service to Cluster
+    # Add Service to Cluster
     try:
         api_response = api_instance.create_namespaced_service(
                 namespace='default', body= service)
@@ -143,7 +143,7 @@ def create_service(api_instance, id):
     
     
 def update(batch_api_instance, core_api_instance, checkServices=False):
-    '''
+    """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
     -----
     check for changes in db and create job+service for new entries
@@ -152,7 +152,7 @@ def update(batch_api_instance, core_api_instance, checkServices=False):
     -----
     (Copy Python Files directly from host, doesn't scale.
      Later use of NFS etc is advised.)
-    '''
+    """
     # Connect to DB
     engine = db.create_engine('sqlite:////mnt/internal/queue.db', convert_unicode=True)
     connection = engine.connect()
@@ -176,11 +176,13 @@ def update(batch_api_instance, core_api_instance, checkServices=False):
         # logging.info(pprint.pformat(api_response))
     except ApiException as e:
         print("Exception when calling BatchV1Api->list_job_for_all_namespaces: %s\n" % e)
+        return
             
     ids_kube = {int(job.metadata.labels['id']) for job in jobs.items if job.metadata.name.startswith('notebook-')}
     ids_to_add = ids_db - ids_kube
     ids_to_delete = ids_kube - ids_db
-    logging.info("ids found: %s | ids needed: %s\ncreating ids: %s\ndeleting ids: %s" % (ids_kube, ids_db, ids_to_add, ids_to_delete))
+    logging.info("ids found: %s | ids needed: %s\ncreating ids: %s\ndeleting ids: %s" %
+                 (ids_kube, ids_db, ids_to_add, ids_to_delete))
     
     # Create new notebooks
     for id in ids_to_add:
@@ -195,22 +197,24 @@ def update(batch_api_instance, core_api_instance, checkServices=False):
 
 
 def update_services(api_instance, ids_db):
-    '''
+    """
     Input: Needs an instance of the CoreV1Api
     -----
     Create Service if there is none
     
     Because Services are created only when notebooks are created,
     this should never add something
-    '''
+    """
     # Get all running services
     try:
         api_response = api_instance.list_service_for_all_namespaces()
         # logging.info(pprint.pformat(api_response.items))
     except ApiException as e:
         logging.warning("Exception when calling BatchV1Api->list_service_for_all_namespaces: %s\n" % e)
+        return
     
-    ids_kube = {int(service.metadata.labels['sid']) for service in api_response.items if service.metadata.name.startswith("nb-entrypoint-")}
+    ids_kube = {int(service.metadata.labels['sid']) for service in api_response.items
+                if service.metadata.name.startswith("nb-entrypoint-")}
     ids_to_add = ids_db - ids_kube
     if len(ids_to_add) > 0:
         logging.warning("Can't find services for ids %s. They will be created" % ids_to_add)
@@ -221,19 +225,20 @@ def update_services(api_instance, ids_db):
 
  
 def delete_completed_jobs(batch_api_instance, core_api_instance, connection, tasks):
-    '''
+    """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
            and the connection to the db and the table tasks
     -----
     When a Job is completed (i.e notebook is quit) it will be deleted
     Its Entry is then deleted from the db
-    '''
+    """
     # Get all running jobs
     try:
         jobs = batch_api_instance.list_job_for_all_namespaces()
         # logging.info(pprint.pformat(api_response))
     except ApiException as e:
         print("Exception when calling BatchV1Api->list_job_for_all_namespaces: %s\n" % e)
+        return
             
     for job in jobs.items:
         if job.metadata.name.startswith('notebook-') and job.status.succeeded == 1:
@@ -242,20 +247,20 @@ def delete_completed_jobs(batch_api_instance, core_api_instance, connection, tas
             logging.info("Notebook finished, id = %d" % id)
             delete_job(batch_api_instance, core_api_instance, id)
             # Delete from db
-            delete = tasks.delete().where(tasks.c.id==id)
+            delete = tasks.delete().where(tasks.c.id == id)
             connection.execute(delete)
             
     
 def delete_job(batch_api_instance, core_api_instance, id):
-    '''
+    """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
     -----
     Delete a Notebook Job+Service that was deleted from the db
-    '''
+    """
     JOB_NAME = "notebook-%02d" % id
     SERVICE_NAME = "nb-entrypoint-%02d" % id
     
-    #Delete Job
+    # Delete Job
     try:
         api_response = batch_api_instance.delete_namespaced_job(
             name=JOB_NAME,
@@ -265,9 +270,10 @@ def delete_job(batch_api_instance, core_api_instance, id):
                 grace_period_seconds=5))
     except ApiException as e:
         print("Exception when calling BatchV1Api->delete_namespaced_job: %s\n" % e)
+        return
     logging.info("Job deleted. status='%s'" % str(api_response.status))
     
-    #Delete Service
+    # Delete Service
     try:
         api_response = core_api_instance.delete_namespaced_service(
             name=SERVICE_NAME,
@@ -277,15 +283,16 @@ def delete_job(batch_api_instance, core_api_instance, id):
                 grace_period_seconds=5))
     except ApiException as e:
         print("Exception when calling BatchV1Api->delete_namespaced_job: %s\n" % e)
+        return
     logging.info("Service deleted. status='%s'" % str(api_response.status))
     
 
 def main():
-    '''
+    """
     Creates and Deletes Jobs+Services for the Notebook images.
     Thy can be reached at 127.0.0.1:31000+<id>
     Updates when it recieves message 'update' from frontend
-    '''
+    """
     # Init api + logger
     config.load_incluster_config()
     batch_api_instance = client.BatchV1Api()
