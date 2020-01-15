@@ -50,6 +50,12 @@ class TaskForm(FlaskForm):
 
 @app.route("/")
 def index():
+    # Update Scheduler
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+        s.sendall(b'update')
+        data = s.recv(1024)
+
     qry = db_session.query(Task)
     results = qry.all()
 
@@ -57,11 +63,6 @@ def index():
     # Keine Nachkommas
     for task in taskList:
         task['duration'] = int(task['duration'])
-        
-    # Update Scheduler
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((HOST, PORT))
-        s.sendall(b'update')
             
     return render_template('index.html', taskList=taskList)
 
@@ -84,7 +85,7 @@ def add_task():
         directory = os.path.join(app.config['PYTHONFILE_FOLDER'], secure_filename(task.owner))
         if not os.path.exists(directory):
             os.makedirs(directory)
-        task.status = 'Creating'
+        task.status = 'Ready'
         file = form.file.data
         task.program = secure_filename(file.filename)
         
@@ -102,6 +103,7 @@ def add_task():
 
             nb.cells.append(nbf.v4.new_code_cell(code))
             nbf.write(nb, filepath.replace('.py', '.ipynb'))
+            os.remove(filepath)
             task.program = task.program.replace('.py', '.ipynb')
 
         db_session.add(task)
@@ -113,7 +115,7 @@ def add_task():
             s.sendall(b'update')
             data = s.recv(1024)
 
-        logging.info('Received status: %s'%data.decode('utf-8'))
+        logging.info('Received status: %s' % data.decode('utf-8'))
         
         return redirect('/')
  
