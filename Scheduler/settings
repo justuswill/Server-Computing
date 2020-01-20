@@ -1,0 +1,3 @@
+cpu=1.5
+mem=5000Mi
+parallel=1

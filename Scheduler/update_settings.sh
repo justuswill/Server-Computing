@@ -1,0 +1,1 @@
+sudo docker image build -t scheduler:1.0 .

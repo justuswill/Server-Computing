@@ -7,7 +7,7 @@ import pprint
 import logging
 
 
-def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
+def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, settings):
     """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
     -----
@@ -20,6 +20,10 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
       - env:
           - name: PY_FILE
             value: <PY_FILE>
+      - resources:
+          limits:
+            cpu: <CPU_SHARE>
+            memory: <MEM_SHARE>
       - volumeMounts:
         - mountPath: "/data"
           subPath: "data"
@@ -35,6 +39,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
     """
     JOB_NAME = "notebook-%02d" % id
     VOLUME_NAME = "hostclaim"
+    CPU_SHARE, MEM_SHARE, _ = settings
 
     # The place to mount the datasets
     data_mount = client.V1VolumeMount(
@@ -46,18 +51,24 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE):
         mount_path="/scripts",
         sub_path="internal/" + USER,
         name="vol")
-    # volume for Datasets/scripts
+    # volume for datasets/scripts
     volume = client.V1Volume(
         name="vol",
         persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
             claim_name=VOLUME_NAME))
     # env-Variables
     env = client.V1EnvVar(name='PY_FILE', value=PY_FILE)
+    # Resources
+    resources = client.V1ResourceRequirements(
+        limits={"cpu": "0", "memory": "0"},
+        requests={"cpu": "0", "memory": "0"}
+    )
     # Container
     container = client.V1Container(
         name="notebook-site",
         image="notebookserver:1.0",
         env=[env],
+        resources=resources,
         volume_mounts=[data_mount, script_mount])
     # Labels
     # selector = client.V1LabelSelector(match_labels={"app":APP_NAME})
@@ -143,7 +154,7 @@ def create_service(api_instance, id):
         logging.warning("Exception when calling CoreV1Api->create_namespaced_service: %s\n" % e)
 
 
-def update(batch_api_instance, core_api_instance, checkServices=False):
+def update(batch_api_instance, core_api_instance, settings, checkServices=False):
     """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
     -----
@@ -180,20 +191,22 @@ def update(batch_api_instance, core_api_instance, checkServices=False):
         return
 
     ids_kube = {int(job.metadata.labels['id']) for job in jobs.items if job.metadata.name.startswith('notebook-')}
-    ids_to_add = ids_db - ids_kube
-    ids_to_delete = ids_kube - ids_db
-    logging.info("ids found: %s | ids needed: %s | creating ids: %s | deleting ids: %s" %
+    ids_to_add = sorted(list(ids_db - ids_kube))
+    ids_to_delete = list(ids_kube - ids_db)
+    logging.info("ids found: %s | ids needed: %s | queued ids: %s | deleting ids: %s" %
                  (ids_kube, ids_db, list(ids_to_add), list(ids_to_delete)))
 
-    # Create new notebooks
-    for id in ids_to_add:
-        create_job(batch_api_instance, core_api_instance, id, users[id], py_files[id])
-
     # Delete old notebooks
-    for id in ids_to_delete:
-        delete_job(batch_api_instance, core_api_instance, id)
+    for _id in ids_to_delete:
+        delete_job(batch_api_instance, core_api_instance, _id)
 
-    update_status(core_api_instance, connection, tasks)
+    new_jobs = settings[2] - update_status(core_api_instance, connection, tasks)
+
+    # Create new notebooks until there are running <parallel> many
+    while new_jobs > 0 and len(ids_to_add) > 0:
+        _id = ids_to_add.pop(0)
+        create_job(batch_api_instance, core_api_instance, _id, users[_id], py_files[_id], settings)
+        new_jobs -= 1
 
     if checkServices:
         update_services(core_api_instance, ids_db)
@@ -202,6 +215,7 @@ def update(batch_api_instance, core_api_instance, checkServices=False):
 def update_status(core_api_instance, connection, tasks):
     """
     Checks for updates in the status of notebooks and changes db accordingly
+    returns how many jobs can be started
     """
     stream_api_instance = client.CoreV1Api()
 
@@ -248,6 +262,9 @@ def update_status(core_api_instance, connection, tasks):
         upd = db.update(tasks).where(tasks.c.id == _id).values(status=st)
         connection.execute(upd)
 
+    # Change Resources
+    return list(status_by_id.keys()).count("Running")
+
 
 def update_services(api_instance, ids_db):
     """
@@ -273,8 +290,8 @@ def update_services(api_instance, ids_db):
         logging.warning("Can't find services for ids %s. They will be created" % ids_to_add)
 
     # Create new services
-    for id in ids_to_add:
-        create_service(api_instance, id)
+    for _id in ids_to_add:
+        create_service(api_instance, _id)
 
 
 def delete_completed_jobs(batch_api_instance, core_api_instance, connection, tasks):
@@ -295,12 +312,12 @@ def delete_completed_jobs(batch_api_instance, core_api_instance, connection, tas
 
     for job in jobs.items:
         if job.metadata.name.startswith('notebook-') and job.status.succeeded == 1:
-            id = int(job.metadata.labels['id'])
+            _id = int(job.metadata.labels['id'])
             # Delete from Kubernetes
-            logging.info("Notebook finished, id = %d" % id)
-            delete_job(batch_api_instance, core_api_instance, id)
+            logging.info("Notebook finished, id = %d" % _id)
+            delete_job(batch_api_instance, core_api_instance, _id)
             # Delete from db
-            delete = tasks.delete().where(tasks.c.id == id)
+            delete = tasks.delete().where(tasks.c.id == _id)
             connection.execute(delete)
 
 
@@ -346,6 +363,7 @@ def main():
     Thy can be reached at 127.0.0.1:31000+<id>
     Updates when it receives message 'update' from frontend
     """
+
     # Init api + logger
     config.load_incluster_config()
     c = client.Configuration()
@@ -356,8 +374,17 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logging.info('Started Scheduler')
 
-    # Check if db and kubernetes line up (also check the if services are running)
-    update(batch_api_instance, core_api_instance, checkServices=True)
+    # init configuration
+    try:
+        with open('settings', 'r') as c:
+            settings = [line.replace('\n', '').split('=')[1] for line in c.readlines()]
+            settings[2] = int(settings[2])
+    except FileNotFoundError:
+        logging.warning('Configuration file not found using standard configuration')
+        settings = ["1.5", "5000Mi", 2]
+
+    # Check if db and kubernetes line up (also check if the services are running)
+    update(batch_api_instance, core_api_instance, settings, checkServices=True)
 
     HOST = '127.0.0.1'  # localhost
     PORT = 65432  # Port to listen on
@@ -378,7 +405,7 @@ def main():
                     if not data:
                         break
                     if data == 'update':
-                        update(batch_api_instance, core_api_instance)
+                        update(batch_api_instance, core_api_instance, settings)
                     conn.sendall(b'Done')
 
 
