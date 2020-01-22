@@ -1,4 +1,4 @@
-# Cloud-Computing
+# Server-Computing
 Cloud-Computing for the GPU-Server with Jupyter Notebooks managed by kuberentes
 
 Installation:
