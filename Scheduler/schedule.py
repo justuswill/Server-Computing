@@ -101,7 +101,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, se
     except ApiException as e:
         logging.warning("Exception when calling CoreV1Api->create_namespaced_job: %s\n" % e)
 
-    # Creat the service
+    # Create the service
     create_service(core_api_instance, id)
 
 
