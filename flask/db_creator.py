@@ -15,6 +15,7 @@ class Task(Base):
     duration = Column(Integer)
     program = Column(String)
     status = Column(String)
+    pwd = Column(String)
  
     def __repr__(self):
         return "%s - %10s - id: %s" % (self.owner, self.task_type, self.id)

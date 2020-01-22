@@ -7,7 +7,7 @@ import pprint
 import logging
 
 
-def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, settings):
+def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, settings):
     """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
     -----
@@ -20,6 +20,8 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, setting
       - env:
           - name: PY_FILE
             value: <PY_FILE>
+          - name: JUPYTER_PWD
+            value: <PWD>
       - resources:
           limits:
             cpu: <CPU_SHARE>
@@ -57,7 +59,8 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, setting
         persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
             claim_name=VOLUME_NAME))
     # env-Variables
-    env = client.V1EnvVar(name='PY_FILE', value=PY_FILE)
+    file_env = client.V1EnvVar(name='PY_FILE', value=PY_FILE)
+    pwd_env = client.V1EnvVar(name='JUPYTER_PWD', value=PWD)
     # Resources
     resources = client.V1ResourceRequirements(
         limits={"cpu": "0", "memory": "0"},
@@ -67,7 +70,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, setting
     container = client.V1Container(
         name="notebook-site",
         image="notebookserver:1.0",
-        env=[env],
+        env=[file_env, pwd_env],
         resources=resources,
         volume_mounts=[data_mount, script_mount])
     # Labels
@@ -154,7 +157,7 @@ def create_service(api_instance, id):
         logging.warning("Exception when calling CoreV1Api->create_namespaced_service: %s\n" % e)
 
 
-def update(batch_api_instance, core_api_instance, settings, checkServices=False):
+def update(batch_api_instance, core_api_instance, settings, check_services=False):
     """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
     -----
@@ -177,6 +180,7 @@ def update(batch_api_instance, core_api_instance, settings, checkServices=False)
     result_set = result_proxy.fetchall()
     ids_db = {x[0] for x in result_set}
     py_files = {x[0]: x[4] for x in result_set}
+    pwds = {x[0]: x[6] for x in result_set}
     users = {x[0]: x[1] for x in result_set}
     logging.info(result_set)
 
@@ -205,10 +209,10 @@ def update(batch_api_instance, core_api_instance, settings, checkServices=False)
     # Create new notebooks until there are running <parallel> many
     while new_jobs > 0 and len(ids_to_add) > 0:
         _id = ids_to_add.pop(0)
-        create_job(batch_api_instance, core_api_instance, _id, users[_id], py_files[_id], settings)
+        create_job(batch_api_instance, core_api_instance, _id, users[_id], py_files[_id], pwds[_id], settings)
         new_jobs -= 1
 
-    if checkServices:
+    if check_services:
         update_services(core_api_instance, ids_db)
 
 
@@ -384,7 +388,7 @@ def main():
         settings = ["1.5", "5000Mi", 2]
 
     # Check if db and kubernetes line up (also check if the services are running)
-    update(batch_api_instance, core_api_instance, settings, checkServices=True)
+    update(batch_api_instance, core_api_instance, settings, check_services=True)
 
     HOST = '127.0.0.1'  # localhost
     PORT = 65432  # Port to listen on

@@ -35,9 +35,10 @@ class Task(db.Model):
     duration = db.Column(db.Integer)
     program = db.Column(db.String)
     status = db.Column(db.String)
+    pwd = db.Column(db.String)
  
     def __repr__(self):
-        return "%s - %10s - id: %s"%(self.owner, self.task_type, self.id)
+        return "%s - %10s - id: %s" % (self.owner, self.task_type, self.id)
 
 
 # Forms
@@ -84,26 +85,28 @@ def add_task():
     if form.validate_on_submit():
         # save to queue
         task = Task()
-        task.owner = form.owner.data or "0"
+        task.owner = secure_filename(form.owner.data) or "dfki"
         task.task_type = form.task_type.data
         task.duration = form.duration.data or 0
+        task.status = 'Ready'
         
-        # Save Script in folder of User and init standard pwd
-        directory = os.path.join(app.config['PYTHONFILE_FOLDER'], secure_filename(task.owner))
+        # Save Script in folder of User
+        directory = os.path.join(app.config['PYTHONFILE_FOLDER'], task.owner)
+        # init standard pwd if new
         if not os.path.exists(directory):
-            logging.info("Make Account for %s" % secure_filename(task.owner))
+            logging.info("Make Account for %s" % task.owner)
             os.makedirs(directory)
             with open(os.path.join(directory, "pwd"), "w+") as pwd:
-                pwd.write(passwd(secure_filename(task.owner)))
+                pwd.write(passwd(task.owner))
+        with open(os.path.join(directory, "pwd"), "r") as pwd:
+            task.pwd = pwd.read()
+            logging.info("pwd %s" % task.pwd)
 
-        task.status = 'Ready'
+        # Uploaded File
         file = form.file.data
         task.program = secure_filename(file.filename)
-        
         logging.info("Uploaded File: %s" % task.program)
-
         filepath = os.path.join(directory, task.program)
-
         file.save(filepath)
 
         # Convert to a notebook if not already
