@@ -2,8 +2,7 @@ from flask import render_template, request, make_response, jsonify, Flask, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileRequired
-from wtforms import StringField, SelectField, IntegerField, validators
+from wtforms import StringField, SelectField, IntegerField, MultipleFileField, validators
 import sys, traceback, os
 import socket
 import logging
@@ -43,11 +42,13 @@ class Task(db.Model):
 
 # Forms
 class TaskForm(FlaskForm):
-    supported_tasks = [('single_python_file', 'einzelne .py'), ('jupyter_notebook', 'Jupyter Notebook')]
+    supported_tasks = [('python', 'Python file(s)'), ('jupyter_notebook', 'Jupyter Notebook'),
+                       ('empty_notebook', 'Empty Notebook')]
     task_type = SelectField('Task', choices=supported_tasks)
     owner = StringField('Ersteller', validators=[validators.Optional()])
     duration = IntegerField('geschätzte Dauer in Minuten', validators=[validators.Optional()])
-    file = FileField('Program', validators=[FileRequired()])
+    files = MultipleFileField('Program / Module')
+    main = StringField('Name of main if many files', validators=[validators.Optional()])
 
 
 class PwdForm(FlaskForm):
@@ -100,25 +101,44 @@ def add_task():
                 pwd.write(passwd(task.owner))
         with open(os.path.join(directory, "pwd"), "r") as pwd:
             task.pwd = pwd.read()
-            logging.info("pwd %s" % task.pwd)
 
-        # Uploaded File
-        file = form.file.data
-        task.program = secure_filename(file.filename)
-        logging.info("Uploaded File: %s" % task.program)
-        filepath = os.path.join(directory, task.program)
-        file.save(filepath)
-
-        # Convert to a notebook if not already
-        if task.task_type == 'single_python_file':
+        # Create empty notebook if none given
+        if task.task_type == 'empty_notebook':
             nb = nbf.v4.new_notebook()
-            with open(filepath) as f:
+            nbf.write(nb, os.path.join(directory, "test.ipynb"))
+            task.program = "test.ipynb"
+
+        # Uploaded Files
+        else:
+            for file in form.files.data:
+                try:
+                    task.program = secure_filename(file.filename)
+                    logging.info("Uploaded File: %s" % task.program)
+                    file.save(os.path.join(directory, task.program))
+                # When no file provided
+                except IsADirectoryError:
+                    flash("Select a file")
+                    return redirect("/addtask")
+
+        # Use main when specified
+        if form.main.data != '':
+            logging.info(form.main.data)
+            task.program = form.main.data
+        # Else use last
+        main_path = os.path.join(directory, task.program)
+
+        # Convert only main to a notebook if not already
+        if task.task_type == 'python':
+            nb = nbf.v4.new_notebook()
+
+            with open(main_path) as f:
                 code = f.read()
 
             nb.cells.append(nbf.v4.new_code_cell(code))
-            nbf.write(nb, filepath.replace('.py', '.ipynb'))
-            os.remove(filepath)
+            nbf.write(nb, main_path.replace('.py', '.ipynb'))
+            os.remove(main_path)
             task.program = task.program.replace('.py', '.ipynb')
+
 
         db_session.add(task)
         db_session.commit()
@@ -163,6 +183,7 @@ def change_pwd():
                 pwd.write(passwd(new_pwd))
                 logging.info("Password changed for user %s" % owner)
                 return redirect('/')
+            pwd.write(saved_pwd)
             flash("Old Password is wrong")
 
     return render_template('change_pwd.html', form=form)
