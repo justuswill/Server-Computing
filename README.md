@@ -1,5 +1,5 @@
 # Server-Computing
-Cloud-Computing for the GPU-Server with Jupyter Notebooks managed by kuberentes
+Cloud-Computing for the GPU-Server with Jupyter Notebooks managed by Kubernetes
 
 Installation:
 download the project and execute the install.sh and a kubernetes cluster will be initialized with a running application
