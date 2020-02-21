@@ -17,9 +17,9 @@ sudo docker image build -t flask:1.0 flask/
 sudo docker image build -t scheduler:1.0 Scheduler/
 sudo docker image build -t notebookserver:1.0 jupyter/
 cd Kubernetes/
-sudo kubectl apply -f kube-flannel.yaml
-sudo kubectl taint node --all node-role.kubernetes.io/master:NoSchedule-
-sudo kubectl apply -f role.yaml
-sudo kubectl apply -f hostpv.yaml
-sudo kubectl apply -f hostclaim.yaml
-sudo kubectl apply -f frontend.yaml
+kubectl apply -f kube-flannel.yaml
+kubectl taint node --all node-role.kubernetes.io/master:NoSchedule-
+kubectl apply -f role.yaml
+kubectl apply -f hostpv.yaml
+kubectl apply -f hostclaim.yaml
+kubectl apply -f frontend.yaml
