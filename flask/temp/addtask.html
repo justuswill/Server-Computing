@@ -8,6 +8,8 @@
 
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+  {{ dropzone.load_css() }}
+  {{ dropzone.style('border: 2px dashed #0087F7; margin: 10%; min-height: 400px;') }}
 </head>
 
 <body style="margin:30">
@@ -32,10 +34,12 @@
         {{ render_field(form.task_type) }}
         {{ render_field(form.owner) }}
         {{ render_field(form.duration) }}
-        <p>
-        {{ render_field(form.files) }}
         {{ render_field(form.main) }}
+        <p>
+        {{ dropzone.create(action='upload') }}
       </dl>
-      <p><input type=submit value=Hinzufügen>
+      <p><input type=submit id="submit" value=Hinzufügen>
     </form>
+    {{ dropzone.load_js() }}
+    {{ dropzone.config() }}
 </body>

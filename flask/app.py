@@ -1,8 +1,10 @@
-from flask import render_template, request, make_response, jsonify, Flask, flash, redirect
+from flask import render_template, request, make_response, jsonify, Flask, flash, redirect, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, IntegerField, MultipleFileField, validators
+from flask_dropzone import Dropzone
+
 import sys, traceback, os
 import socket
 import logging
@@ -10,19 +12,28 @@ import nbformat as nbf
 from notebook.auth.security import passwd, passwd_check
 from db_setup import init_db, db_session
 
-HOST = '127.0.0.1'  # The server's hostname or IP address
-PORT = 65432        # The port used by the server
 
+# Connection to Scheduler
+HOST = '127.0.0.1'
+PORT = 65432
 
 app = Flask(__name__, template_folder='temp')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/internal/queue.db'
 app.secret_key = "warumbraucheichdich"
 app.config['UPLOAD_FOLDER'] = '/mnt/data'
 app.config['PYTHONFILE_FOLDER'] = '/mnt/internal'
+app.config.update(
+    DROPZONE_IN_FORM=True,
+    DROPZONE_UPLOAD_ON_CLICK=True,
+    DROPZONE_UPLOAD_ACTION='handle_drop',
+    DROPZONE_UPLOAD_BTN_ID='submit',
+    DROPZONE_UPLOAD_MULTIPLE=True,
+    DROPZONE_PARALLEL_UPLOADS=10000,
+)
 
 db = SQLAlchemy(app)
+dropzone = Dropzone(app)
 init_db()
-
 
 # Models
 class Task(db.Model):
@@ -59,6 +70,9 @@ class PwdForm(FlaskForm):
 
 @app.route("/")
 def index():
+    # Start Session
+    session['status'] = True
+    session['files'] = []
     # Update Scheduler
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
@@ -74,6 +88,22 @@ def index():
         task['duration'] = int(task['duration'])
             
     return render_template('index.html', taskList=taskList)
+
+
+@app.route('/dropzone', methods=['POST'])
+def handle_drop():
+    """
+    Handle uploads from the dropzone and save them in a folder for later use
+    """
+    session['files'] = []
+    session['status'] = False
+    for key, f in request.files.items():
+        logging.info("%s uploaded over dopzone" % f.filename)
+        if key.startswith('file'):
+            f.save(os.path.join(app.config['PYTHONFILE_FOLDER'], secure_filename(f.filename)))
+            session['files'] = session['files'] + [secure_filename(f.filename)]
+    session['status'] = True
+    return '', 204
 
 
 @app.route("/addtask", methods=["GET", "POST"])
@@ -110,20 +140,31 @@ def add_task():
 
         # Uploaded Files
         else:
-            for file in form.files.data:
-                try:
-                    task.program = secure_filename(file.filename)
-                    logging.info("Uploaded File: %s" % task.program)
-                    file.save(os.path.join(directory, task.program))
-                # When no file provided
-                except IsADirectoryError:
-                    flash("Select a file")
-                    return redirect("/addtask")
+            if session['status'] == False:
+                flash("Uploaded Files not ready")
+                return redirect("/addtask")
+            elif len(session['files']) == 0:
+                flash("Select a file")
+                return redirect("/addtask")
+            else:
+                for file in session['files']:
+                    try:
+                        task.program = file
+                        # Move to correct location
+                        os.replace(os.path.join(app.config['PYTHONFILE_FOLDER'], file),
+                                   os.path.join(directory, file))
+                    # When no file provided
+                    except IsADirectoryError:
+                        flash("Select a file")
+                        return redirect("/addtask")
 
         # Use main when specified
         if form.main.data != '':
-            logging.info(form.main.data)
-            task.program = form.main.data
+            task.program = secure_filename(form.main.data)
+            if not os.path.isfile(os.path.join(directory, task.program)):
+                flash("This main file doesn't exist")
+                return redirect("/addtask")
+
         # Else use last
         main_path = os.path.join(directory, task.program)
 
