@@ -3,43 +3,104 @@
     <title>Cloud Server for Computing</title>
     
     <!-- Required meta tags -->
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-  <!-- Bootstrap CSS -->
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
-  {{ dropzone.load_css() }}
-  {{ dropzone.style('border: 2px dashed #0087F7; margin: 10%; min-height: 400px;') }}
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+
+    <!-- Dropzone CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dropzone@5.2.0/dist/min/dropzone.min.css" type="text/css">
+    <style>
+        .dropzone{border: 2px dashed #0087F7; margin: 10%; min-height: 400px;}
+    </style>
 </head>
 
 <body style="margin:30">
+    <!-- Flash/Alerts -->
     {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert alert-info alert-dismissible" role="alert">
-          <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-          <!-- <strong>Title</strong> --> {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info alert-dismissible" role="alert">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <!-- <strong>Title</strong> --> {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
     {% endwith %}
+
+    <!-- Back to start -->
     <a href="{{ url_for('.index') }}"> Abbrechen </a>
     <p>
     <p>
-     
+
+    <!-- Form to input the data -->
     {% from "_formhelper.html" import render_field %}
     <form method="POST" enctype="multipart/form-data">
-      <dl>
-        {{ form.hidden_tag() }} 
-        {{ render_field(form.task_type) }}
-        {{ render_field(form.owner) }}
-        {{ render_field(form.duration) }}
-        {{ render_field(form.main) }}
-        <p>
-        {{ dropzone.create(action='upload') }}
-      </dl>
-      <p><input type=submit id="submit" value=Hinzufügen>
+        <dl>
+            {{ form.hidden_tag() }}
+            {{ render_field(form.task_type) }}
+            {{ render_field(form.owner) }}
+            {{ render_field(form.duration) }}
+            {{ render_field(form.main) }}
+            <div class="dropzone" id="myDropzone"></div>
+            <input type=submit id="submit" value=Hinzufügen>
+        </dl>
     </form>
-    {{ dropzone.load_js() }}
-    {{ dropzone.config() }}
+
+    <!-- JS -->
+    <script src="https://cdn.jsdelivr.net/npm/dropzone@5.2.0/dist/dropzone.min.js"></script>
+    <script>
+        Dropzone.options.myDropzone = {
+            init: function() {
+
+                dz = this; // Makes sure that 'this' is understood inside the functions below.
+
+                // upload queue when button click
+                document.getElementById("submit").addEventListener("click", function handler(e) {
+                    e.currentTarget.removeEventListener(e.type, handler);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dz.processQueue();
+                });
+
+                // redirect after queue complete
+                this.on("queuecomplete", function(file) {
+                    document.getElementById("submit").click();
+                });
+
+                // sends other data
+                this.on("sendingmultiple", function(file, xhr, data) {
+                    if(file.fullPath){
+                        data.append("fullPath", file.fullPath);
+                    }
+                    else{
+                        data = null
+                    }
+                });
+            },
+
+            url: "/dropzone",
+            autoProcessQueue: false,
+
+            // click upload options
+            uploadMultiple: true,
+            parallelUploads: 10000,
+            paramName: "file", // The name that will be used to transfer the file
+            maxFilesize: 50, // MB
+            acceptedFiles: null,
+            maxFiles: null,
+            dictDefaultMessage: `Drop files here or click to upload.`, // message display on drop area
+            dictFallbackMessage: "Your browser does not support drag'n'drop file uploads.",
+            dictInvalidFileType: "You can't upload files of this type.",
+            dictFileTooBig: "File is too big {{filesize}}. Max filesize: {{maxFilesize}}MiB.",
+            dictResponseError: "Server error: {{statusCode}}",
+            dictMaxFilesExceeded: "You can't upload any more files.",
+            dictCancelUpload: "Cancel upload",
+            dictRemoveFile: "Remove file",
+            dictCancelUploadConfirmation: "You really want to delete this file?",
+            dictUploadCanceled: "Upload canceled",
+            // custom options code
+        };
+     </script>
 </body>

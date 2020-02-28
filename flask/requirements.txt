@@ -1,7 +1,6 @@
 Flask==1.1.1
 Flask-sqlalchemy==2.4.1
 Flask-WTF==0.14.2
-flask-dropzone
 nbformat
 notebook
 werkzeug==0.16.0

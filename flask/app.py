@@ -3,7 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, IntegerField, MultipleFileField, validators
-from flask_dropzone import Dropzone
 
 import sys, traceback, os
 import socket
@@ -22,17 +21,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////mnt/internal/queue.db'
 app.secret_key = "warumbraucheichdich"
 app.config['UPLOAD_FOLDER'] = '/mnt/data'
 app.config['PYTHONFILE_FOLDER'] = '/mnt/internal'
-app.config.update(
-    DROPZONE_IN_FORM=True,
-    DROPZONE_UPLOAD_ON_CLICK=True,
-    DROPZONE_UPLOAD_ACTION='handle_drop',
-    DROPZONE_UPLOAD_BTN_ID='submit',
-    DROPZONE_UPLOAD_MULTIPLE=True,
-    DROPZONE_PARALLEL_UPLOADS=10000,
-)
 
 db = SQLAlchemy(app)
-dropzone = Dropzone(app)
 init_db()
 
 # Models
@@ -97,8 +87,10 @@ def handle_drop():
     """
     session['files'] = []
     session['status'] = False
+    logging.info(vars(request))
     for key, f in request.files.items():
         logging.info("%s uploaded over dopzone" % f.filename)
+        logging.info(vars(f))
         if key.startswith('file'):
             f.save(os.path.join(app.config['PYTHONFILE_FOLDER'], secure_filename(f.filename)))
             session['files'] = session['files'] + [secure_filename(f.filename)]
@@ -162,8 +154,11 @@ def add_task():
         if form.main.data != '':
             task.program = secure_filename(form.main.data)
             if not os.path.isfile(os.path.join(directory, task.program)):
-                flash("This main file doesn't exist")
-                return redirect("/addtask")
+                # Try again with added suffix
+                task.program = secure_filename(form.main.data) + ".py"
+                if not os.path.isfile(os.path.join(directory, task.program)):
+                    flash("This main file doesn't exist")
+                    return redirect("/addtask")
 
         # Else use last
         main_path = os.path.join(directory, task.program)
