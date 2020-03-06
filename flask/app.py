@@ -87,13 +87,12 @@ def handle_drop():
     """
     session['files'] = []
     session['status'] = False
-    logging.info(vars(request))
     for key, f in request.files.items():
-        logging.info("%s uploaded over dopzone" % f.filename)
-        logging.info(vars(f))
         if key.startswith('file'):
+            logging.info("%s uploaded over dropzone" % f.filename)
+            i = int(key.split("[")[-1].strip("]"))
             f.save(os.path.join(app.config['PYTHONFILE_FOLDER'], secure_filename(f.filename)))
-            session['files'] = session['files'] + [secure_filename(f.filename)]
+            session['files'] = session['files'] + [(secure_filename(f.filename), request.form['fullPath_%d' % i])]
     session['status'] = True
     return '', 204
 
@@ -112,6 +111,11 @@ def add_task():
         task.task_type = form.task_type.data
         task.duration = form.duration.data or 0
         task.status = 'Ready'
+
+        # Ugly but finds next id
+        qry = db_session.query(Task)
+        results = qry.all()
+        task.id = max([int(vars(task)['id']) for task in results], default=1)
         
         # Save Script in folder of User
         directory = os.path.join(app.config['PYTHONFILE_FOLDER'], task.owner)
@@ -124,47 +128,61 @@ def add_task():
         with open(os.path.join(directory, "pwd"), "r") as pwd:
             task.pwd = pwd.read()
 
+        # Place in sub folder of id
+        directory = os.path.join(directory, str(task.id))
+
         # Create empty notebook if none given
         if task.task_type == 'empty_notebook':
             nb = nbf.v4.new_notebook()
             nbf.write(nb, os.path.join(directory, "test.ipynb"))
             task.program = "test.ipynb"
+            found = True
 
         # Uploaded Files
         else:
-            if session['status'] == False:
-                flash("Uploaded Files not ready")
+            # Try to find main
+            task.program = form.main.data if form.main.data.endswith('.py') else form.main.data + ".py"
+            found = False
+            last = None
+
+            if session['status'] is False:
+                flash("Uploaded Files were not ready")
                 return redirect("/addtask")
             elif len(session['files']) == 0:
                 flash("Select a file")
                 return redirect("/addtask")
             else:
-                for file in session['files']:
+
+                # Get rid of folder where files where in by stepping into the common prefix
+                prefix = os.path.commonpath([path for _, path in session['files']])
+
+                for file, fullPath in session['files']:
+                    relpath = os.path.relpath(fullPath, prefix)
+
+                    last = relpath
+                    if file == task.program or relpath == task.program:
+                        found = True
+                        task.program = relpath
+
                     try:
-                        task.program = file
                         # Move to correct location
+                        loc = os.path.join(directory, os.path.dirname(relpath))
+                        if not os.path.exists(loc):
+                            os.makedirs(loc)
                         os.replace(os.path.join(app.config['PYTHONFILE_FOLDER'], file),
-                                   os.path.join(directory, file))
+                                   os.path.join(directory, relpath))
                     # When no file provided
                     except IsADirectoryError:
                         flash("Select a file")
                         return redirect("/addtask")
 
-        # Use main when specified
-        if form.main.data != '':
-            task.program = secure_filename(form.main.data)
-            if not os.path.isfile(os.path.join(directory, task.program)):
-                # Try again with added suffix
-                task.program = secure_filename(form.main.data) + ".py"
-                if not os.path.isfile(os.path.join(directory, task.program)):
-                    flash("This main file doesn't exist")
-                    return redirect("/addtask")
-
-        # Else use last
-        main_path = os.path.join(directory, task.program)
+        # Use last file uploaded if no main is found
+        if not found:
+            task.program = last
 
         # Convert only main to a notebook if not already
         if task.task_type == 'python':
+            main_path = os.path.join(directory, task.program)
             nb = nbf.v4.new_notebook()
 
             with open(main_path) as f:
@@ -174,7 +192,6 @@ def add_task():
             nbf.write(nb, main_path.replace('.py', '.ipynb'))
             os.remove(main_path)
             task.program = task.program.replace('.py', '.ipynb')
-
 
         db_session.add(task)
         db_session.commit()

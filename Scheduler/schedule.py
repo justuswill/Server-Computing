@@ -31,7 +31,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, se
           subPath: "data"
           name: vol
         - mountPath: "/scripts"
-          subPath: "internal/USER"
+          subPath: "internal/<USER>/<id>"
           name: vol
     volumes:
       - name: vol
@@ -51,7 +51,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, se
     # The place to mount the scripts
     script_mount = client.V1VolumeMount(
         mount_path="/scripts",
-        sub_path="internal/" + USER,
+        sub_path="internal/%s/%d" % (USER, id),
         name="vol")
     # volume for datasets/scripts
     volume = client.V1Volume(

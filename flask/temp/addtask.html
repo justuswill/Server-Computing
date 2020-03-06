@@ -70,13 +70,19 @@
                 });
 
                 // sends other data
-                this.on("sendingmultiple", function(file, xhr, data) {
-                    if(file.fullPath){
-                        data.append("fullPath", file.fullPath);
-                    }
-                    else{
-                        data = null
-                    }
+                this.on("sendingmultiple", function(files, xhr, data) {
+                    console.log(files)
+                    files.forEach(function (file, i) {
+                        console.log(file)
+                        console.log(data)
+                        if(file.fullPath){
+                            data.append("fullPath_" + i.toString(), file.fullPath);
+                        }
+                        else{
+                            data.append("fullPath_" + i.toString(), file.name);
+                        }
+                        console.log(data)
+                    });
                 });
             },
 
