@@ -4,7 +4,7 @@ from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, IntegerField, MultipleFileField, validators
 
-import sys, traceback, os
+import sys, traceback, os, shutil
 import socket
 import logging
 import nbformat as nbf
@@ -115,7 +115,9 @@ def add_task():
         # Ugly but finds next id
         qry = db_session.query(Task)
         results = qry.all()
-        task.id = max([int(vars(task)['id']) for task in results], default=1)
+        logging.info([vars(task) for task in results])
+        task.id = max([int(vars(task)['id']) for task in results], default=0) + 1
+        logging.info(task.id)
         
         # Save Script in folder of User
         directory = os.path.join(app.config['PYTHONFILE_FOLDER'], task.owner)
@@ -130,6 +132,20 @@ def add_task():
 
         # Place in sub folder of id
         directory = os.path.join(directory, str(task.id))
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        else:
+            # Delete previous files
+            for f in os.listdir(directory):
+                file_path = os.path.join(directory, f)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    flash('Failed to delete %s. Reason: %s - This should never happen!' % (file_path, e))
+                    return redirect("/addtask")
 
         # Create empty notebook if none given
         if task.task_type == 'empty_notebook':
@@ -153,8 +169,9 @@ def add_task():
                 return redirect("/addtask")
             else:
 
-                # Get rid of folder where files where in by stepping into the common prefix
-                prefix = os.path.commonpath([path for _, path in session['files']])
+                # Get rid of folder where files were in by stepping into the common prefix
+                prefix = os.path.commonpath([path for _, path in session['files']])\
+                    if len(session['files']) >= 2 else ""
 
                 for file, fullPath in session['files']:
                     relpath = os.path.relpath(fullPath, prefix)
