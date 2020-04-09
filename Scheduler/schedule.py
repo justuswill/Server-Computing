@@ -3,15 +3,19 @@ from kubernetes.stream import stream
 from kubernetes.client.rest import ApiException
 import socket
 import sqlalchemy as db
-import pprint
 import logging
 
 
 def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, settings):
     """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
+           id           - id of task
+           USER         - User/Owner of the task (so the executable files can be reached)
+           PY_FILE, PWD - the ENV variables to be set for Jupyter to work as intended
+           settings = (CPU_SHARE, MEM_SHARE, _) - how much CPU and RAM to use at most
     -----
-    Create a Job from the Notebook-Container:
+    Create a Job from a Notebook-Container and add it to the cluster.
+    The job is similarly structured like this YAML:
     ----------
     labels: id:<id>
     containers:
@@ -63,7 +67,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, se
     pwd_env = client.V1EnvVar(name='JUPYTER_PWD', value=PWD)
     # Resources
     resources = client.V1ResourceRequirements(
-        limits={"cpu": "0", "memory": "0"},
+        limits={"cpu": CPU_SHARE, "memory": MEM_SHARE},
         requests={"cpu": "0", "memory": "0"}
     )
     # Container
@@ -73,8 +77,6 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, se
         env=[file_env, pwd_env],
         resources=resources,
         volume_mounts=[data_mount, script_mount])
-    # Labels
-    # selector = client.V1LabelSelector(match_labels={"app":APP_NAME})
     # Pod-Spec
     template = client.V1PodTemplateSpec(
         metadata=client.V1ObjectMeta(labels={"id": str(id)}),
@@ -101,7 +103,7 @@ def create_job(batch_api_instance, core_api_instance, id, USER, PY_FILE, PWD, se
     except ApiException as e:
         logging.warning("Exception when calling CoreV1Api->create_namespaced_job: %s\n" % e)
 
-    # Create the service
+    # Create the service so the notebook becomes accessible
     create_service(core_api_instance, id)
 
 
@@ -109,12 +111,13 @@ def create_service(api_instance, id):
     """
     Input: Needs an instance of the CoreV1Api
     -----
-    Create a Service for the Notebook-Job:
+    Create a Service for the Notebook-Job.
+    The service is similarly structured like this YAML:
     -----
     apiVersion: v1
     kind: Service
     metadata:
-      name: SERVICE_NAME
+      name: <SERVICE_NAME>
       namespace: default
     spec:
       type: NodePort
@@ -123,7 +126,7 @@ def create_service(api_instance, id):
       ports:
       - port: 8888
         targetPort: 8888
-        nodePort: NODE_PORT
+        nodePort: <NODE_PORT>
     -----
     """
     SERVICE_NAME = "nb-entrypoint-%02d" % id
@@ -160,13 +163,11 @@ def create_service(api_instance, id):
 def update(batch_api_instance, core_api_instance, settings, check_services=False):
     """
     Input: Needs an instance of the BatchV1Api and the CoreV1Api
+           settings = (_, _, parallel) - how many tasks to run at once
     -----
     check for changes in db and create job+service for new entries
     also delete job+service for deleted entries
     if checkServices is True check if existing jobs have their service
-    -----
-    (Copy Python Files directly from host, doesn't scale.
-     Later use of NFS etc is advised.)
     """
     # Connect to DB
     engine = db.create_engine('sqlite:////mnt/internal/queue.db', convert_unicode=True)
@@ -174,7 +175,7 @@ def update(batch_api_instance, core_api_instance, settings, check_services=False
     metadata = db.MetaData()
     tasks = db.Table('tasks', metadata, autoload=True, autoload_with=engine)
 
-    # Get all existing ids
+    # Get all existing ids (and other data)
     query = db.select([tasks])
     result_proxy = connection.execute(query)
     result_set = result_proxy.fetchall()
@@ -193,7 +194,6 @@ def update(batch_api_instance, core_api_instance, settings, check_services=False
     except ApiException as e:
         print("Exception when calling BatchV1Api->list_job_for_all_namespaces: %s\n" % e)
         return
-
     ids_kube = {int(job.metadata.labels['id']) for job in jobs.items if job.metadata.name.startswith('notebook-')}
     ids_to_add = sorted(list(ids_db - ids_kube))
     ids_to_delete = list(ids_kube - ids_db)
@@ -204,7 +204,9 @@ def update(batch_api_instance, core_api_instance, settings, check_services=False
     for _id in ids_to_delete:
         delete_job(batch_api_instance, core_api_instance, _id)
 
-    new_jobs = settings[2] - update_status(core_api_instance, connection, tasks)
+    # There can be <parallel> task at once
+    parallel = settings[2]
+    new_jobs = parallel - update_status(core_api_instance, connection, tasks)
 
     # Create new notebooks until there are running <parallel> many
     while new_jobs > 0 and len(ids_to_add) > 0:
@@ -274,10 +276,11 @@ def update_services(api_instance, ids_db):
     """
     Input: Needs an instance of the CoreV1Api
     -----
-    Create Service if there is none
-
+    Creates a service for every job that doesn't have one.
+    -----
     Because Services are created only when notebooks are created,
-    this should never add something
+    unless something goes wrong this should never do something.
+    It is for fail-proofing and stability and is not necessary in a setting with no complications/error.
     """
     # Get all running services
     try:
@@ -286,7 +289,6 @@ def update_services(api_instance, ids_db):
     except ApiException as e:
         logging.warning("Exception when calling BatchV1Api->list_service_for_all_namespaces: %s\n" % e)
         return
-
     ids_kube = {int(service.metadata.labels['sid']) for service in api_response.items
                 if service.metadata.name.startswith("nb-entrypoint-")}
     ids_to_add = ids_db - ids_kube
@@ -364,8 +366,9 @@ def delete_job(batch_api_instance, core_api_instance, id):
 def main():
     """
     Creates and Deletes Jobs+Services for the Notebook images.
-    Thy can be reached at 127.0.0.1:31000+<id>
-    Updates when it receives message 'update' from frontend
+    They can be reached at 127.0.0.1:31000+<id>
+    Updates when it receives message 'update' from frontend.
+    See method 'update' for more info
     """
 
     # Init api + logger

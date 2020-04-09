@@ -3,36 +3,41 @@
     <title>Cloud Server for Computing</title>
     
     <!-- Required meta tags -->
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-  <!-- Bootstrap CSS -->
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
 </head>
 
 <body style="margin:30">
+    <!-- Flash messages in case of wrong user input -->
     {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert alert-info alert-dismissible" role="alert">
-          <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-          <!-- <strong>Title</strong> --> {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info alert-dismissible" role="alert">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
     {% endwith %}
+
+    <!-- Back to start -->
     <a href="{{ url_for('.index') }}"> Abbrechen </a>
     <p>
     <p>
-     
+
+    <!-- Form to input the data -->
     {% from "_formhelper.html" import render_field %}
     <form method="POST" enctype="multipart/form-data">
-      <dl>
-        {{ form.hidden_tag() }}
-        {{ render_field(form.owner) }}
-        {{ render_field(form.old_pwd) }}
-        {{ render_field(form.new_pwd) }}
-      </dl>
-      <p><input type=submit value="Change password">
+        <dl>
+            {{ form.hidden_tag() }}
+            {{ render_field(form.owner) }}
+            {{ render_field(form.old_pwd) }}
+            {{ render_field(form.new_pwd) }}
+        </dl>
+        <p>
+        <input type=submit value="Change password">
     </form>
 </body>

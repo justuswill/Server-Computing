@@ -48,7 +48,7 @@
         </dl>
     </form>
 
-    <!-- JS -->
+    <!-- JS for Dropzone -->
     <script src="https://cdn.jsdelivr.net/npm/dropzone@5.2.0/dist/dropzone.min.js"></script>
     <script>
         Dropzone.options.myDropzone = {
@@ -69,7 +69,7 @@
                     document.getElementById("submit").click();
                 });
 
-                // sends other data
+                // sends full relative path for server-side reconstruction
                 this.on("sendingmultiple", function(files, xhr, data) {
                     console.log(files)
                     files.forEach(function (file, i) {
@@ -86,14 +86,15 @@
                 });
             },
 
-            url: "/dropzone",
-            autoProcessQueue: false,
+            // max size for files to upload (in MB)
+            maxFilesize: 50,
 
-            // click upload options
+            // other settings
             uploadMultiple: true,
             parallelUploads: 10000,
-            paramName: "file", // The name that will be used to transfer the file
-            maxFilesize: 50, // MB
+            url: "/dropzone",
+            autoProcessQueue: false,
+            paramName: "file",
             acceptedFiles: null,
             maxFiles: null,
             dictDefaultMessage: `Drop files here or click to upload.`, // message display on drop area
@@ -106,7 +107,6 @@
             dictRemoveFile: "Remove file",
             dictCancelUploadConfirmation: "You really want to delete this file?",
             dictUploadCanceled: "Upload canceled",
-            // custom options code
         };
      </script>
 </body>

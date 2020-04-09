@@ -1,7 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy import Column, Integer, String, Float, Unicode
 from sqlalchemy.ext.declarative import declarative_base
- 
+
+"""
+This class is used to create or re-create the database file
+It shouldn't be used unless the Entries of the table are changed.
+For resetting the database copy queue.db from this folder instead
+"""
+
 engine = create_engine('sqlite:///queue.db', echo=True)
 Base = declarative_base()
  

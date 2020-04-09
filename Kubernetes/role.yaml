@@ -1,3 +1,4 @@
+# Gives the Scheduler pod full access
 kind: ServiceAccount
 apiVersion: v1
 metadata:
