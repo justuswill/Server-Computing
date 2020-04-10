@@ -274,6 +274,10 @@ def change_pwd():
         old_pwd = secure_filename(form.old_pwd.data)
         new_pwd = secure_filename(form.new_pwd.data)
 
+        if owner == "dfki":
+            flash("This users password can't be changed")
+            return redirect("/changepwd")
+
         pwd_path = os.path.join(app.config['PYTHONFILE_FOLDER'], secure_filename(owner), "pwd")
 
         # Check if it is a valid user
