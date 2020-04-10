@@ -396,13 +396,20 @@ def main():
     HOST = '127.0.0.1'  # localhost
     PORT = 65432  # Port to listen on
 
+    # If there is no connection still update every <update_rate> seconds
+    update_rate = 300
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((HOST, PORT))
 
         # Listen for Connection:
         while True:
+            s.settimeout(update_rate)
             s.listen()
-            conn, addr = s.accept()
+            try:
+                conn, addr = s.accept()
+            except socket.timeout:
+                # Manual Update
+                update(batch_api_instance, core_api_instance, settings)
             with conn:
                 logging.info('Connected by %s' % str(addr))
                 while True:

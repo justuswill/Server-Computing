@@ -1,5 +1,5 @@
 FROM pytorch/pytorch:latest
-COPY requirements.txt /app/requirements.txt
+COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 ENV PY_FILE=
 ENV JUPYTER_PWD=

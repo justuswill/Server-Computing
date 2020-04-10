@@ -4,14 +4,21 @@ from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, IntegerField, MultipleFileField, validators
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
 import sys, traceback, os, shutil
 import socket
 import logging
 import nbformat as nbf
 from notebook.auth.security import passwd, passwd_check
 
-from db_setup import init_db, db_session
-
+# Connect to database
+engine = create_engine('sqlite:////mnt/internal/queue.db', convert_unicode=True)
+db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+Base = declarative_base()
+Base.query = db_session.query_property()
 
 # Connection to Scheduler
 HOST = '127.0.0.1'
@@ -26,7 +33,7 @@ app.config['PYTHONFILE_FOLDER'] = '/mnt/internal'
 
 # Database
 db = SQLAlchemy(app)
-init_db()
+Base.metadata.create_all(bind=engine)
 
 
 # Model (as used in the database)

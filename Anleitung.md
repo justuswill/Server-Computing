@@ -37,8 +37,8 @@ sudo docker image build -t scheduler:1.0 Scheduler/
 sudo docker image build -t notebookserver:1.0 jupyter/
 
 # Restart Server
-kubectl delete -f frontend.yaml
-kubectl apply -f frontend.yaml
+kubectl delete -f Kubernetes/frontend.yaml
+kubectl apply -f Kubernetes/frontend.yaml
 ```
 
 Hier die Konfigurationsmöglichkeiten in aufsteigender Komplexität:
@@ -115,11 +115,15 @@ Sonst empfiehlt sich: https://kubernetes.io/docs/concepts/storage/volumes/#types
 Die Refreshrate der Startseite lässt sich in `flask/temp/index.html (Z.7)` auf die Sekunde einstellen.
 Standardmäßig wird alle 30 Sekunden aktualisiert.
 
+Ist kein Web-Interface im Browser geöffnet und zwingt den `Scheduler` zu einem Updateschritt,
+so macht dieser standardmäßig alle 5 Minuten ein manuelles Update, um zu schauen,
+ob ein `Job` fertig wurde. Diese Refreshrate lässt sich in `Scheduler/schedule.py (Z.400)` ändern.
+
 Die Einstellungen der Dropzone für das Hochladen von Python Code finden sich in `flask/temp/addtask.html`.
 Vor allem die maximale Größe einer Datei könnte hier evtl. zu Problemen führen.
 
 Diw Webseite kann beschleunigt werden, wenn nach jeder Nachricht an den `Scheduler` nicht auf desen Antwort gewartet wird.
-Dies kann man in `flask/app.py (Z.88 und Z.255)` ändern. Die höhere Geschwindigkeit geht zu Lasten der Fehleranfälligkeit.
+Dies kann man in `flask/app.py (Z.95 und Z.262)` ändern. Die höhere Geschwindigkeit geht zu Lasten der Fehleranfälligkeit.
 
 Für eigene Änderungen am Code der Webseite sollte der Debug Modus von Flask angeschaltet werden.
 Dies geht in `flask/app.py` ganz unten.
@@ -146,8 +150,8 @@ Neben der optionalen Angabe von geschätzter Dauer und Ersteller wird zu jedem T
 - ***Finished:*** Die Ausführung eines Tasks ist beendet und es kann auf die Ergebnisse der Ausführung
                   in Jupyter zugegriffen werden, bzw. mit dem Notebook interagiert werden.
                   
-Ein Task kann beendet werden, indem man nach der Ausführung das `Jupyter Notebook` öffnet und es dort schließt.
-Man kann dann wieder auf die Startseite zurückkehren.
+Ein Task kann beendet werden, indem man nach der Ausführung das `Jupyter Notebook` öffnet
+und es dort unter `Quit` schließt. Man kann dann wieder auf die Startseite zurückkehren.
 
 Es findet Sich außerdem Zugang zu den folgenden Funktionen:
 
