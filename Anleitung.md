@@ -10,7 +10,7 @@ Hier finden sich einige wichtigen Infos zu:
 - Passwörter
 - Containerisierung
 
-##Installation:
+## Installation:
 Damit Kubernetes und das serverseitige Program installiert werden können, muss der Inhalt dieses Repositories
 heruntergeladen werden und die `install.sh` ausgeführt werden.
 Es wird dann ein Kubernetes-Cluster auf dem Rechner erstellt und der Server hochgefahren.
@@ -24,7 +24,7 @@ git clone https://github.com/Jukamala/Server-Computing.git
 ./install.sh
 ```
 
-##Konfiguration:
+## Konfiguration:
 Der Server kann an vielen Stellen angepasst werden.
 
 Generell gilt, dass nach einer Änderung die `Docker-Images` geupdatet
@@ -68,13 +68,13 @@ kubectl apply -f hostpv.yaml
 kubectl apply -f hostclaim.yaml
 ```
 
-####Ports
+#### Ports
 Von außen kann das Cluster über einen sogenanntes `NodePort` erreicht werden.
 Dieser Port wird auf jedem Knoten des Clusters freigegeben.
 Standardmäßig ist der Port auf `30001` eingestellt, er kann geändert werden, indem in `Kubernetes/frontend.yaml`
 das Attribut `nodePort` in der letzten Zeile geändert wird.
 
-####Pakete
+#### Pakete
 Standardmäßig haben die `Kubernetes-Jobs`, auf denen Jupyter läuft, nur eine begrenzte Anzahl von Paketen installiert.
 (z.B. PyTorch, Scikit-learn, etc.)
 Soll ein Programm laufen, dass andere Pakete verwendet, so kann man die Liste der Pakete unter
@@ -83,7 +83,7 @@ da die aktuellste Version von `tornado`, welche `Jupyter` mitliefert zum Zeitpun
 zu Kompatibilitätsproblemen geführt hat.
 Ansonsten kann die Liste beliebig ergänzt werden. 
 
-####Ordnerstruktur und Volumes
+#### Ordnerstruktur und Volumes
 
 Die Datensätze und die internen Daten (Die Warteschlange, laufender Code, Passwörter)
 werden standardmäßig auf der Festplatte des Rechners abgelegt.
@@ -110,7 +110,7 @@ sowie in `Scheduler/schedule.py (Z. 47)` der Wert von `VOLUME_NAME` angepasst we
 Falls NFS verwendet wird, kann man als Startpunkt unter `Kubernetes/Unused` ein PV und PVC finden.
 Sonst empfiehlt sich: https://kubernetes.io/docs/concepts/storage/volumes/#types-of-volumes
 
-####Sonstiges
+#### Sonstiges
 
 Die Refreshrate der Startseite lässt sich in `flask/temp/index.html (Z.7)` auf die Sekunde einstellen.
 Standardmäßig wird alle 30 Sekunden aktualisiert.
@@ -174,7 +174,7 @@ bei einzelnen Dateien ist dies natürlich nicht nötig.
 Eckdaten wie Ersteller und geschätzte Dauer können optional angegeben werden.
 Wird kein Ersteller angegeben, so wird der Standardnutzer `dfki` mit unveränderlichem Passwort `dfki` verwendet
 
-####Datensätze hochladen
+#### Datensätze hochladen
 Man kann hier (auch große) Datensätze hochladen und erhält ein visuelles Feedback über den Fortschritt des Uploads.
 Die hier hochgeladenen Datensätze können innerhalb des Containers eines jeden Tasks
 über den absouluten Pfad `/data` erreicht werden.
@@ -203,7 +203,7 @@ gespeichert. Die Verschlüsselung geschieht erst auf der Seite des Servers, desh
 im Netzwerk übertragen und kann theoretisch abgefangen werden.
 Der Passwortschutz dient nur als rudimentärer Schutz der eigenen Tasks.
 
-##Containerisierung:
+## Containerisierung:
 Intern ist der Server folgendermaßen strukturiert:
 
 `Kubernetes` arbeitet mit sogenannten `Pods`, die grob gesprochen, eine zusammenhängende ausführbare Einheit 
@@ -225,7 +225,7 @@ und im Fall eines Absturz eine neue Kopie hochfährt.
 Jeder Task der erstellt wird, wird über ein `Job` gesteuert, der dafür sorgt das mindestens ein `Pod` des
 `Jupyter Notebook Servers` bis zur Beendigung läuft. Die Erstellung dieser `Jobs` ist Aufgabe des Schedulers.
 
-####Ablauf der Durchführung eines Tasks
+#### Ablauf der Durchführung eines Tasks
 Nachdem ein Task über das Web-Interface hinzugefügt wird, wird er vom `Flask Server` in die Datenbank eingetragen.
 Danach wird der `Scheduler` aufgerufen. Dieser führt ein Updateschritt durch und erkennt dabei,
 dass ein neuer Eintrag der Datenbank vorliegt. Er erstellt einen `Job`. Falls gerade Kapazität frei ist übergibt er
